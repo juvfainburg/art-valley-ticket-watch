@@ -1,7 +1,7 @@
 name: Art Valley ticket watch
 on:
   schedule:
-    - cron: "2-59/5 * * * *"   # every 5 min (GitHub minimum), off the busy :00 minute
+    - cron: "2-59/5 * * * *"   # every 5 min (GitHub minimum), off the busy :00 minute (schedule owner: account-linked email)
   workflow_dispatch:
     inputs:
       test:
