@@ -233,7 +233,70 @@ def main():
         log("ALERT " + msg + " " + r["url"])
         notify(title, msg, r["url"], "urgent" if urgent else "high")
         st["alerted"].append(r["key"])
+
+    if os.environ.get("DAILY_CHECKIN"):
+        daily_checkin(st, cheapest)
     save_state(st)
+    if os.environ.get("GH_HANDOFF") and ON_MAC:
+        gh_handoff()
+
+
+REPO = "juvfainburg/art-valley-ticket-watch"
+LABEL = "com.ticketwatch.artvalley"
+
+
+def daily_checkin(st, cheapest):
+    """One message a day after 9 am Sydney, so silence means the bot stopped."""
+    now = time.time()
+    st["checks"] = [t for t in st.get("checks", []) if now - t < 86400] + [now]
+    try:
+        from zoneinfo import ZoneInfo
+        import datetime
+        syd = datetime.datetime.now(ZoneInfo("Australia/Sydney"))
+    except Exception as e:
+        log("checkin clock failed: %s" % e)
+        return
+    today = syd.strftime("%Y-%m-%d")
+    if syd.hour < 9 or st.get("checkin_date") == today:
+        return
+    price = ("cheapest ticket now A$%.0f + A$%.0f fee" % (cheapest["price"], cheapest["fee"])
+             if cheapest else "no tickets listed right now")
+    ok = push("Art Valley watch: daily check-in",
+              "Running fine: %d checks in the last 24 h, %s. No message tomorrow "
+              "morning = the bot stopped." % (len(st["checks"]), price),
+              RESALE_URL, "low")
+    if ok:
+        st["checkin_date"] = today
+        log("daily check-in sent")
+
+
+def gh_handoff():
+    """Mac stand-in: once GitHub has run on its own 3 times lately, retire."""
+    try:
+        req = urllib.request.Request(
+            "https://api.github.com/repos/%s/actions/runs?event=schedule&per_page=5" % REPO,
+            headers={"User-Agent": "ticket-watch", "Accept": "application/vnd.github+json"})
+        runs = json.loads(urllib.request.urlopen(req, timeout=20).read())["workflow_runs"]
+    except Exception as e:
+        log("handoff check failed: %s" % e)
+        return
+    import datetime
+    now = datetime.datetime.now(datetime.timezone.utc)
+    good = [r for r in runs if r.get("conclusion") == "success"]
+    if len(good) < 3:
+        return
+    newest = datetime.datetime.strptime(good[0]["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=datetime.timezone.utc)
+    if (now - newest).total_seconds() > 30 * 60:
+        return
+    log("HANDOFF: GitHub ran on its own %d times, Mac checker switching off" % len(good))
+    push("Art Valley watch: GitHub took over",
+         "GitHub is now checking on its own. The Mac checker switched itself off.",
+         "https://github.com/%s/actions" % REPO, "default")
+    plist = Path.home() / "Library/LaunchAgents" / (LABEL + ".plist")
+    if plist.exists():
+        plist.unlink()
+    subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (os.getuid(), LABEL)], check=False)
 
 
 if __name__ == "__main__":

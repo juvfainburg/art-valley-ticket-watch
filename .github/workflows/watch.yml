@@ -1,7 +1,7 @@
 name: Art Valley ticket watch
 on:
   schedule:
-    - cron: "*/5 * * * *"   # every 5 min, GitHub minimum (runs can start a few min late)
+    - cron: "2-59/5 * * * *"   # every 5 min (GitHub minimum), off the busy :00 minute
   workflow_dispatch:
     inputs:
       test:
@@ -27,6 +27,7 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           WATCH_DIR: .state
+          DAILY_CHECKIN: "1"
       - uses: actions/cache/save@v4
         if: always()
         with:
