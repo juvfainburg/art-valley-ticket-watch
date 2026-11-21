@@ -1,0 +1,5 @@
+state.json
+watch.log
+ntfy_topic
+.state/
+__pycache__/

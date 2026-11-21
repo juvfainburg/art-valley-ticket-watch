@@ -1,0 +1,29 @@
+name: Art Valley ticket watch
+on:
+  schedule:
+    - cron: "3-59/10 * * * *"   # every 10 min (GitHub may start a run a few min late)
+  workflow_dispatch: {}
+concurrency:
+  group: watch
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: watch-state-${{ github.run_id }}
+          restore-keys: watch-state-
+      - name: Check Triniq resale
+        run: python3 art_valley_watch.py
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          WATCH_DIR: .state
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .state
+          key: watch-state-${{ github.run_id }}
