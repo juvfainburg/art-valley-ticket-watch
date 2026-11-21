@@ -271,10 +271,10 @@ def daily_checkin(st, cheapest):
 
 
 def gh_handoff():
-    """Mac stand-in: once GitHub has run on its own 3 times lately, retire."""
+    """Mac stand-in: retire once GitHub's runs restart themselves (2 done + 1 live)."""
     try:
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/actions/runs?event=schedule&per_page=5" % REPO,
+            "https://api.github.com/repos/%s/actions/runs?per_page=20" % REPO,
             headers={"User-Agent": "ticket-watch", "Accept": "application/vnd.github+json"})
         runs = json.loads(urllib.request.urlopen(req, timeout=20).read())["workflow_runs"]
     except Exception as e:
@@ -282,14 +282,22 @@ def gh_handoff():
         return
     import datetime
     now = datetime.datetime.now(datetime.timezone.utc)
-    good = [r for r in runs if r.get("conclusion") == "success"]
-    if len(good) < 3:
+
+    def own(r):  # started by GitHub itself, not by a person
+        who = (r.get("triggering_actor") or r.get("actor") or {}).get("login", "")
+        return who == "github-actions[bot]" or r.get("event") == "schedule"
+
+    def age(r):
+        t = datetime.datetime.strptime(r["created_at"], "%Y-%m-%dT%H:%M:%SZ")
+        return (now - t.replace(tzinfo=datetime.timezone.utc)).total_seconds()
+
+    mine = [r for r in runs if own(r)]
+    good = [r for r in mine if r.get("conclusion") == "success"]
+    live = [r for r in mine if r.get("status") in ("queued", "in_progress", "waiting", "pending")
+            or age(r) < 75 * 60]
+    if len(good) < 2 or not live:
         return
-    newest = datetime.datetime.strptime(good[0]["created_at"], "%Y-%m-%dT%H:%M:%SZ").replace(
-        tzinfo=datetime.timezone.utc)
-    if (now - newest).total_seconds() > 30 * 60:
-        return
-    log("HANDOFF: GitHub ran on its own %d times, Mac checker switching off" % len(good))
+    log("HANDOFF: GitHub restarted itself %d times, Mac checker switching off" % len(good))
     push("Art Valley watch: GitHub took over",
          "GitHub is now checking on its own. The Mac checker switched itself off.",
          "https://github.com/%s/actions" % REPO, "default")

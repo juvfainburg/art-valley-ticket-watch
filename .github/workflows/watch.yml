@@ -1,20 +1,31 @@
 name: Art Valley ticket watch
+# Self-restarting: each run checks Triniq every 2 minutes for about an hour,
+# then starts the next run itself, so it never waits on GitHub's timer.
+# The hourly schedule below is only a backup to revive the chain if it breaks.
+# Stop everything: gh workflow disable watch.yml (then cancel the running run).
 on:
   schedule:
-    - cron: "2-59/5 * * * *"   # every 5 min (GitHub minimum), off the busy :00 minute (schedule owner: account-linked email)
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       test:
         description: "Send a test alert to the phone instead of checking"
         type: boolean
         default: false
+      minutes:
+        description: "How long this run keeps checking before handing over"
+        type: string
+        default: "60"
+permissions:
+  actions: write     # lets a run start the next one
+  contents: read
 concurrency:
-  group: watch
+  group: watch       # one run at a time, at most one waiting
   cancel-in-progress: false
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache/restore@v4
@@ -22,14 +33,33 @@ jobs:
           path: .state
           key: watch-state-${{ github.run_id }}
           restore-keys: watch-state-
-      - name: Check Triniq resale
-        run: python3 art_valley_watch.py ${{ inputs.test && '--test' || '' }}
+      - name: Check Triniq resale every 2 minutes
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           WATCH_DIR: .state
           DAILY_CHECKIN: "1"
+          TEST: ${{ inputs.test }}
+          MINUTES: ${{ inputs.minutes || '60' }}
+        run: |
+          if [ "$TEST" = "true" ]; then python3 art_valley_watch.py --test; exit 0; fi
+          end=$(( $(date +%s) + MINUTES * 60 ))
+          while :; do
+            python3 art_valley_watch.py || echo "check failed, carrying on"
+            [ $(( $(date +%s) + 120 )) -gt "$end" ] && break
+            sleep 120
+          done
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: .state
           key: watch-state-${{ github.run_id }}
+      - name: Start the next run
+        if: always() && inputs.test != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in 1 2 3 4 5; do
+            gh workflow run watch.yml --ref main -R "$GITHUB_REPOSITORY" && exit 0
+            sleep 30
+          done
+          exit 1
