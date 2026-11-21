@@ -2,7 +2,12 @@ name: Art Valley ticket watch
 on:
   schedule:
     - cron: "3-59/10 * * * *"   # every 10 min (GitHub may start a run a few min late)
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test alert to the phone instead of checking"
+        type: boolean
+        default: false
 concurrency:
   group: watch
   cancel-in-progress: false
@@ -18,7 +23,7 @@ jobs:
           key: watch-state-${{ github.run_id }}
           restore-keys: watch-state-
       - name: Check Triniq resale
-        run: python3 art_valley_watch.py
+        run: python3 art_valley_watch.py ${{ inputs.test && '--test' || '' }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           WATCH_DIR: .state
