@@ -1,7 +1,7 @@
 name: Art Valley ticket watch
 on:
   schedule:
-    - cron: "3-59/10 * * * *"   # every 10 min (GitHub may start a run a few min late)
+    - cron: "*/5 * * * *"   # every 5 min, GitHub minimum (runs can start a few min late)
   workflow_dispatch:
     inputs:
       test:

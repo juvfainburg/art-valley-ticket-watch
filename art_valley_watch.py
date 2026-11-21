@@ -6,7 +6,7 @@ marketplace) and alerts (phone push via ntfy, plus a Mac notification when run
 on a Mac) when an entry ticket is listed below the target price. Each listing
 alerts once, not every 10 minutes.
 
-  python3 art_valley_watch.py            one check (what launchd runs every 10 min)
+  python3 art_valley_watch.py            one check (GitHub every 5 min, the Mac every 2 min)
   python3 art_valley_watch.py --show     print every listing now, no alert
   python3 art_valley_watch.py --test     fire a test alert (phone + Mac)
   python3 art_valley_watch.py --dry N    list what WOULD alert at limit N
