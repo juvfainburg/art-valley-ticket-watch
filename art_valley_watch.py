@@ -264,7 +264,7 @@ def daily_checkin(st, cheapest):
     ok = push("Art Valley watch: daily check-in",
               "Running fine: %d checks in the last 24 h, %s. No message tomorrow "
               "morning = the bot stopped." % (len(st["checks"]), price),
-              RESALE_URL, "low")
+              RESALE_URL, "default")
     if ok:
         st["checkin_date"] = today
         log("daily check-in sent")
